@@ -1,15 +1,24 @@
-const fs = require('node:fs');
-const path = require('node:path');
-const Database = require('better-sqlite3');
-const dataDir = path.join(__dirname, '..', 'data');
-fs.mkdirSync(dataDir, { recursive: true });
-const db = new Database(process.env.DATABASE_PATH || path.join(dataDir, 'tasks.db'));
-db.pragma('journal_mode = WAL');
-db.exec(`CREATE TABLE IF NOT EXISTS tasks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT NOT NULL,
-  description TEXT NOT NULL DEFAULT '',
-  completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0,1)),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-)`);
-module.exports = db;
+
+const { Pool } = require('pg');
+
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is missing.');
+}
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 5
+});
+
+pool.ready = pool.query(`
+  CREATE TABLE IF NOT EXISTS tasks (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(120) NOT NULL,
+    description VARCHAR(1000) NOT NULL DEFAULT '',
+    completed BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+module.exports = pool;
